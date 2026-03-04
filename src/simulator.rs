@@ -69,6 +69,30 @@ impl Simulator {
         }
     }
 
+    /// Apply a CZ gate: applies a phase of -1 when both `control` and `target` are |1⟩.
+    pub fn cz(&mut self, control: usize, target: usize) {
+        assert_ne!(control, target, "Control and target must be different qubits");
+        assert!(control < self.n_qubits && target < self.n_qubits, "Qubit index out of range");
+        for i in 0..self.state.len() {
+            if (i >> control) & 1 == 1 && (i >> target) & 1 == 1 {
+                self.state[i] = -self.state[i];
+            }
+        }
+    }
+
+    /// Apply a Toffoli (CCX) gate: flips `target` when both `c0` and `c1` are |1⟩.
+    pub fn toffoli(&mut self, c0: usize, c1: usize, target: usize) {
+        assert!(c0 != c1 && c0 != target && c1 != target, "All qubits must be distinct");
+        assert!(c0 < self.n_qubits && c1 < self.n_qubits && target < self.n_qubits, "Qubit index out of range");
+        let n = self.state.len();
+        for i in 0..n {
+            if (i >> c0) & 1 == 1 && (i >> c1) & 1 == 1 && (i >> target) & 1 == 0 {
+                let j = i | (1 << target);
+                self.state.swap(i, j);
+            }
+        }
+    }
+
     /// Probability of measuring qubit in state |1⟩ without collapsing.
     pub fn prob_one(&self, qubit: usize) -> f64 {
         (0..self.state.len())
