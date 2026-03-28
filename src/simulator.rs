@@ -135,6 +135,38 @@ impl Simulator {
             .collect()
     }
 
+    /// Reduced 2×2 density matrix for `qubit`, obtained by tracing out all others.
+    /// Works for both pure and mixed (entangled) states.
+    pub fn reduced_density_matrix(&self, qubit: usize) -> [[Complex64; 2]; 2] {
+        assert!(qubit < self.n_qubits, "Qubit index out of range");
+        let mut rho = [[Complex64::new(0.0, 0.0); 2]; 2];
+        let n = self.state.len();
+        for i in 0..n {
+            let bi = (i >> qubit) & 1;
+            for j in 0..n {
+                let bj = (j >> qubit) & 1;
+                // Only sum over pairs that agree on all qubits except `qubit`
+                if (i ^ j) == (1 << qubit) || i == j {
+                    if (i & !(1 << qubit)) == (j & !(1 << qubit)) {
+                        rho[bi][bj] += self.state[i] * self.state[j].conj();
+                    }
+                }
+            }
+        }
+        rho
+    }
+
+    /// Bloch vector (x, y, z) for `qubit`.
+    /// For a pure unentangled qubit this lies on the unit sphere.
+    /// For an entangled qubit the vector lies strictly inside (mixed state).
+    pub fn bloch_vector(&self, qubit: usize) -> (f64, f64, f64) {
+        let rho = self.reduced_density_matrix(qubit);
+        let x =  2.0 * rho[0][1].re;
+        let y = -2.0 * rho[0][1].im;
+        let z = rho[0][0].re - rho[1][1].re;
+        (x, y, z)
+    }
+
     pub fn probabilities(&self) -> Vec<f64> {
         self.state.iter().map(|c| c.norm_sqr()).collect()
     }

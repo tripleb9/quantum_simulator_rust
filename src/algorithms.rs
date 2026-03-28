@@ -1,6 +1,90 @@
 use crate::gates;
 use crate::simulator::Simulator;
 
+// ── Bell / CHSH ──────────────────────────────────────────────────────────────
+
+/// Estimate the CHSH correlation E(a, b) = ⟨A⊗B⟩ over `shots` runs.
+/// Alice measures qubit 0 after rotating by `angle_a`, Bob qubit 1 by `angle_b`.
+fn chsh_correlation(angle_a: f64, angle_b: f64, shots: usize) -> f64 {
+    let mut total = 0.0;
+    for _ in 0..shots {
+        let mut sim = Simulator::new(2);
+        // Prepare Bell state |Φ+⟩
+        sim.apply(gates::hadamard(), 0);
+        sim.cnot(0, 1);
+        // Rotate into measurement basis
+        sim.apply(gates::ry(-2.0 * angle_a), 0);
+        sim.apply(gates::ry(-2.0 * angle_b), 1);
+        let a = if sim.measure(0) == 0 { 1.0f64 } else { -1.0 };
+        let b = if sim.measure(1) == 0 { 1.0f64 } else { -1.0 };
+        total += a * b;
+    }
+    total / shots as f64
+}
+
+/// Run the CHSH test and print a screenshot-ready summary.
+/// Classical bound: |S| ≤ 2.  Quantum maximum: 2√2 ≈ 2.828.
+pub fn demo_chsh(shots: usize) {
+    use std::f64::consts::PI;
+    // Standard CHSH angles
+    let a  = 0.0;
+    let a2 = PI / 4.0;
+    let b  = PI / 8.0;
+    let b2 = 3.0 * PI / 8.0;
+
+    let e1 = chsh_correlation(a,  b,  shots);
+    let e2 = chsh_correlation(a,  b2, shots);
+    let e3 = chsh_correlation(a2, b,  shots);
+    let e4 = chsh_correlation(a2, b2, shots);
+    let s  = e1 - e2 + e3 + e4;
+
+    println!("╔══════════════════════════════════════════════╗");
+    println!("║         Bell Inequality (CHSH) Test          ║");
+    println!("╠══════════════════════════════════════════════╣");
+    println!("║  Entangled state: |Φ+⟩ = (|00⟩+|11⟩) / √2  ║");
+    println!("║  Shots per correlation: {shots:<21}║");
+    println!("╠══════════════════════════════════════════════╣");
+    println!("║  E(a , b ) = {:>+.4}                         ║", e1);
+    println!("║  E(a , b') = {:>+.4}                         ║", e2);
+    println!("║  E(a', b ) = {:>+.4}                         ║", e3);
+    println!("║  E(a', b') = {:>+.4}                         ║", e4);
+    println!("╠══════════════════════════════════════════════╣");
+    println!("║  S = E(a,b) - E(a,b') + E(a',b) + E(a',b') ║");
+    println!("║  S = {:.4}                                  ║", s);
+    println!("║                                              ║");
+    println!("║  Classical limit:  |S| ≤ 2.0000             ║");
+    println!("║  Quantum maximum:  |S| ≤ 2.8284  (2√2)      ║");
+    println!("║                                              ║");
+    if s.abs() > 2.0 {
+        println!("║  ✓ VIOLATION CONFIRMED — quantum beats       ║");
+        println!("║    any classical hidden-variable theory      ║");
+    } else {
+        println!("║  (increase shots for a clearer violation)    ║");
+    }
+    println!("╚══════════════════════════════════════════════╝");
+}
+
+// ── Grover scaling ───────────────────────────────────────────────────────────
+
+/// Print a table comparing classical vs Grover query counts across qubit counts.
+pub fn demo_grover_scaling() {
+    println!("╔════════╦══════════════╦══════════════╦══════════════╗");
+    println!("║ Qubits ║ States (2^n) ║ Classical    ║ Grover       ║");
+    println!("╠════════╬══════════════╬══════════════╬══════════════╣");
+    for n in 2usize..=8 {
+        let states = 1usize << n;
+        let classical = states / 2;           // average case
+        let quantum = ((std::f64::consts::PI / 4.0) * (states as f64).sqrt()).ceil() as usize;
+        let speedup = classical as f64 / quantum as f64;
+        let cell = format!("{} ({:.1}x)", quantum, speedup);
+        println!("║ {:>6} ║ {:>12} ║ {:>12} ║ {:<12} ║",
+            n, states, classical, cell);
+    }
+    println!("╚════════╩══════════════╩══════════════╩══════════════╝");
+    println!("  Classical = N/2 average queries");
+    println!("  Grover    = ⌈(π/4)√N⌉ queries — quadratic speedup");
+}
+
 /// Deutsch-Jozsa: determines if a function is constant or balanced in one query.
 /// Uses n+1 qubits: qubits 0..n-1 are input, qubit n is the |-> ancilla.
 /// `oracle` must flip the ancilla (qubit n) conditioned on the input.
