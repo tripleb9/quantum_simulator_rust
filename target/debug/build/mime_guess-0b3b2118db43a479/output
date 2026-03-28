@@ -1,1 +1,0 @@
-cargo:rustc-env=MIME_TYPES_GENERATED_PATH=/home/chief/quantum_rust2/target/debug/build/mime_guess-0b3b2118db43a479/out/mime_types_generated.rs
